@@ -44,10 +44,38 @@ def receive_update():
 
     elif "voice" in data["message"]:
         send_text(chat_id, "I heard your voice! Please type your command for now.")
-        # (Later I can add real speech-to-text here)
 
     return {"ok": True}
 
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    import os
+
+    # LOCAL MODE (VSCode testing)
+    if os.getenv("LOCAL_MODE") == "true":
+        print("🟢 MalarMa LOCAL MODE activated (polling)...")
+        from telegram.ext import Application, CommandHandler, MessageHandler, filters
+
+        app = Application.builder().token(TELEGRAM_TOKEN).build()
+
+        async def start(update, context):
+            await update.message.reply_text(
+                "🚀 MalarMa LOCAL! Try: news, how are you, play song"
+            )
+
+        async def handle_message(update, context):
+            user_text = update.message.text
+            reply = handle_command(user_text)
+            await update.message.reply_text(reply)
+
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+        print("✅ Polling active - Test in Telegram!")
+        app.run_polling()
+
+    # PRODUCTION MODE (Render webhook)
+    else:
+        print("🌐 MalarMa PRODUCTION MODE (webhook)...")
+        port = int(os.environ.get("PORT", 5000))
+        app.run(host="0.0.0.0", port=port, debug=False)

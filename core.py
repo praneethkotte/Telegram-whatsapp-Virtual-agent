@@ -34,7 +34,7 @@ def handle_command(command: str):
     # --- ALEXA-LIKE FEATURES ---
 
     if "how are you" in c:
-        return "I'm amazing, especially when I’m helping you!"
+        return "I'm amazing bestie, especially when I’m helping you praneeth!"
 
     if c.startswith("open "):
         site = c.replace("open", "").strip().replace(" ", "")
