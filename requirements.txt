@@ -1,5 +1,8 @@
-flask
-requests
+python-telegram-bot==20.6
 openai
+pygame
+gTTS
+selenium
+requests
+inputimeout
 python-dotenv
-gtts

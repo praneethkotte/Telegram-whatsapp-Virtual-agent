@@ -1,81 +1,65 @@
 import os
-import requests
-from flask import Flask, request
-from core import handle_command
+import threading
 from dotenv import load_dotenv
-from gtts import gTTS
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from core import handle_command
 
 load_dotenv()
-
-app = Flask(__name__)
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/"
+LOCAL_MODE = os.getenv("LOCAL_MODE", "true").lower() == "true"
+
+greeted_users = set()
 
 
-def send_text(chat_id, text):
-    url = BASE_URL + "sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-    requests.post(url, json=payload)
+def telegram_send_func(chat_id, msg_type, text=None, file=None):
+    from telegram import Bot
+
+    bot = Bot(token=TELEGRAM_TOKEN)
+    if msg_type == "text":
+        bot.send_message(chat_id, text)
+    elif msg_type == "voice":
+        bot.send_voice(chat_id, open(file, "rb"))
 
 
-def send_voice(chat_id, text):
-    tts = gTTS(text)
-    tts.save("reply.mp3")
+async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id not in greeted_users:
+        greeted_users.add(chat_id)
+        handle_command("startup", chat_id, telegram_send_func)
+    if update.message.voice:
+        voice_file = await context.bot.get_file(update.message.voice.file_id)
+        await voice_file.download_to_drive("voice.ogg")
+        # Use OpenAI Whisper or skip transcription here
+        text = "voice input received"
+        handle_command(text, chat_id, telegram_send_func)
+        os.remove("voice.ogg")
+        return
+    if update.message.text:
+        text = update.message.text
+        handle_command(text, chat_id, telegram_send_func)
 
-    url = BASE_URL + "sendVoice"
-    files = {"voice": open("reply.mp3", "rb")}
-    data = {"chat_id": chat_id}
 
-    requests.post(url, files=files, data=data)
-    os.remove("reply.mp3")
+def laptop_listener():
+    from inputimeout import inputimeout, TimeoutOccurred
 
-
-@app.route("/", methods=["POST"])
-def receive_update():
-    data = request.json
-    chat_id = data["message"]["chat"]["id"]
-
-    if "text" in data["message"]:
-        user_text = data["message"]["text"]
-        reply = handle_command(user_text)
-        send_text(chat_id, reply)
-        send_voice(chat_id, reply)
-
-    elif "voice" in data["message"]:
-        send_text(chat_id, "I heard your voice! Please type your command for now.")
-
-    return {"ok": True}
+    while True:
+        try:
+            user_input = inputimeout(prompt="YOU (Laptop): ", timeout=10)
+            if user_input:
+                handle_command(user_input, "laptop")
+        except TimeoutOccurred:
+            continue
 
 
 if __name__ == "__main__":
-    import os
-
-    # LOCAL MODE (VSCode testing)
-    if os.getenv("LOCAL_MODE") == "true":
-        print("🟢 MalarMa LOCAL MODE activated (polling)...")
-        from telegram.ext import Application, CommandHandler, MessageHandler, filters
+    if LOCAL_MODE:
+        thread = threading.Thread(target=laptop_listener, daemon=True)
+        thread.start()
 
         app = Application.builder().token(TELEGRAM_TOKEN).build()
-
-        async def start(update, context):
-            await update.message.reply_text(
-                "🚀 MalarMa LOCAL! Try: news, how are you, play song"
-            )
-
-        async def handle_message(update, context):
-            user_text = update.message.text
-            reply = handle_command(user_text)
-            await update.message.reply_text(reply)
-
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-        print("✅ Polling active - Test in Telegram!")
+        app.add_handler(
+            MessageHandler(filters.TEXT | filters.VOICE, handle_telegram_message)
+        )
+        print("Malar Ma Ready! Laptop + Telegram Mode")
         app.run_polling()
-
-    # PRODUCTION MODE (Render webhook)
-    else:
-        print("🌐 MalarMa PRODUCTION MODE (webhook)...")
-        port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port, debug=False)
