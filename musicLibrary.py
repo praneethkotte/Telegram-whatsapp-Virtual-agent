@@ -1,0 +1,17 @@
+music = {
+    "stealth": "https://www.youtube.com/watch?v=U47Tr9BB_wE",
+    "march": "https://www.youtube.com/watch?v=Xqeq4b5u_Xw",
+    "Unstoppable": "https://www.youtube.com/watch?v=EuD-uTHvTU0",
+    "skyfall": "https://www.youtube.com/watch?v=DeumyOzKqgI&pp=ygUHc2t5ZmFsbA%3D%3D",
+    "wolf": "https://www.youtube.com/watch?v=ThCH0U6aJpU&list=PLnrGi_-oOR6wm0Vi-1OsiLiV5ePSPs9oF&index=21",
+    "simbu": "https://www.youtube.com/watch?v=kw6SFbbinnY",
+    "Asha Pasham": "https://www.youtube.com/watch?v=mJPEf7vWb6Q&list=RDmJPEf7vWb6Q&start_radio=1&rv=kw6SFbbinnY",
+    "Aa Rojulu Malli Raavu": "https://www.youtube.com/watch?v=G4lG0waC_Ic&list=RDmJPEf7vWb6Q&index=2",
+    "Oke Oka Jeevitham": "https://www.youtube.com/watch?v=ftbK-3hF_HA&list=RDmJPEf7vWb6Q&index=3",
+    "Neetho Unte Chalu": "https://www.youtube.com/watch?v=o19q-7-nIyA&list=RDmJPEf7vWb6Q&index=6",
+    "Mastaaru Mastaaru": "https://www.youtube.com/watch?v=AXSm49NGkg8&list=RDmJPEf7vWb6Q&index=8",
+    "Fear Song": "https://www.youtube.com/watch?v=g44VQxMcFH4&list=RDmJPEf7vWb6Q&index=9",
+    "Kaagadada Doniyalli": "https://www.youtube.com/watch?v=EtGh9oC2SZ0&list=RDmJPEf7vWb6Q&index=10",
+    "The Life Of Ram": "https://www.youtube.com/watch?v=2a34XyiZO14&list=RDmJPEf7vWb6Q&index=13",
+    "Believe": "https://www.youtube.com/watch?v=W0DM5lcj6mw",
+}
