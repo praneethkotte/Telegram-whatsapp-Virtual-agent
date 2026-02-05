@@ -1,8 +1,10 @@
-python-telegram-bot==20.6
-openai
-pygame
-gTTS
-selenium
-requests
-inputimeout
+python-telegram-bot==20.3
+flask
+twilio
 python-dotenv
+requests
+gTTS
+pygame
+speechrecognition
+pyaudio
+selenium

@@ -1,67 +1,75 @@
 import os
 import threading
 import speech_recognition as sr
-from core import handle_command
-from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from core import handle_command, speak_laptop
+from dotenv import load_dotenv
 
-# Load dotenv
 load_dotenv()
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Track users
-greeted_users = set()
-user_states = {}
 
-
-# ---- LAPTOP VOICE / KEYBOARD LISTENER ----
-def laptop_listener():
+def laptop_voice_listener():
     r = sr.Recognizer()
     mic = sr.Microphone()
-    with mic as source:
-        r.adjust_for_ambient_noise(source)
-    print("LAPTOP MIC ACTIVE")
+
+    print("LAPTOP VOICE ACTIVE")
+
     while True:
         try:
-            # Keyboard input
-            user_input = input("YOU (Laptop): ").strip()
-            if user_input:
-                handle_command(user_input)
-        except Exception as e:
-            print(f"Error: {e}")
+            with mic as source:
+                audio = r.listen(source, timeout=5, phrase_time_limit=5)
+            text = r.recognize_google(audio)
+            print(f"LAPTOP VOICE YOU: {text}")
+            handle_command(text, chat_id="laptop", platform="laptop")
+        except:
+            pass
 
 
-# ---- TELEGRAM HANDLER ----
+def laptop_keyboard_listener():
+    print("LAPTOP KEYBOARD ACTIVE — You can type now")
+    while True:
+        user_input = input("YOU (Laptop): ")
+        handle_command(user_input, chat_id="laptop", platform="laptop")
+
+
 async def telegram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    if chat_id not in greeted_users:
-        greeted_users.add(chat_id)
-        handle_command("startup", chat_id, first_message=True)
 
-    # Voice message
+    if update.message.text:
+        text = update.message.text
+        reply = handle_command(text, chat_id, platform="telegram", bot=context.bot)
+        await update.message.reply_text(reply)
+
     if update.message.voice:
         file = await context.bot.get_file(update.message.voice.file_id)
         await file.download_to_drive("voice.ogg")
-        text = "Voice transcription not implemented here yet"
-        handle_command(text, chat_id)
-        return
 
-    # Text message
-    if update.message.text:
-        handle_command(update.message.text, chat_id)
+        import speech_recognition as sr
+
+        r = sr.Recognizer()
+
+        with sr.AudioFile("voice.ogg") as source:
+            audio = r.record(source)
+
+        text = r.recognize_google(audio)
+        os.remove("voice.ogg")
+
+        reply = handle_command(text, chat_id, platform="telegram", bot=context.bot)
+        await update.message.reply_text(reply)
 
 
-# ---- MAIN ----
 if __name__ == "__main__":
-    # Start laptop thread
-    threading.Thread(target=laptop_listener, daemon=True).start()
+    print("Starting Malar Ma...")
+    speak_laptop("Hi Praneeth! Your Malar Ma is here.")
 
-    # Start Telegram using v20+ correct builder
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    threading.Thread(target=laptop_voice_listener, daemon=True).start()
+    threading.Thread(target=laptop_keyboard_listener, daemon=True).start()
+
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT | filters.VOICE, telegram_handler))
 
-    print("MALAR MA READY! Laptop & Telegram active.")
-
-    # Run the bot
+    print("BOT IS LIVE — Telegram + Laptop Ready")
     app.run_polling()

@@ -1,41 +1,24 @@
 import os
 import requests
 import urllib.parse
-import pygame
-import time
 import subprocess
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
-from openai import OpenAI
-from dotenv import load_dotenv
+import time
 from datetime import datetime
 from gtts import gTTS
-from pathlib import Path
+import pygame
+from dotenv import load_dotenv
 
-# Load .env properly
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
-# OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
-# News API key
-NEWS_API_KEY = "bcb884ea1ae74c0a9d558fe2100b0898"
-
-# Pygame init
 pygame.mixer.init()
 
-# Track user states for Telegram
 user_states = {}
 
-# Retry limit
-RETRY_LIMIT = 3
 
-
-# ---- Voice functions ----
 def speak_laptop(text):
-    print(f"MALARMA: {text}")
+    print(f"MALAR MA: {text}")
     try:
         tts = gTTS(text)
         tts.save("temp.mp3")
@@ -50,188 +33,162 @@ def speak_laptop(text):
     return text
 
 
-def speak_telegram(chat_id, text):
+def speak_telegram(chat_id, text, bot):
     try:
         tts = gTTS(text[:200])
         tts.save("telegram_voice.mp3")
-        TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendVoice"
-        with open("telegram_voice.mp3", "rb") as f:
-            files = {"voice": f}
-            data = {"chat_id": chat_id}
-            requests.post(url, files=files, data=data)
+        with open("telegram_voice.mp3", "rb") as audio:
+            bot.send_voice(chat_id=chat_id, voice=audio)
         os.remove("telegram_voice.mp3")
     except:
         pass
 
 
-def send_telegram_text(chat_id, text):
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    requests.post(url, json=data)
+def speak_whatsapp(text):
+    try:
+        tts = gTTS(text[:200])
+        tts.save("whatsapp_voice.mp3")
+        return "whatsapp_voice.mp3"
+    except:
+        return None
 
 
-# ---- News functions ----
-def get_news_by_location(country="in", state=None, city=None):
-    today = datetime.now().strftime("%B %d, %Y")
-    q = (
-        f"{city} {state} {country}"
-        if city
-        else f"{state} {country}" if state else country
+def main_menu(chat_id=None, platform="laptop", bot=None):
+    response = (
+        "Praneeth! Your Malar Ma is here. What can I do today?\n"
+        "Say or type:\n"
+        "1. News\n"
+        "2. Open YouTube\n"
+        "3. Open Website"
     )
-    news_text = f"TOP {q.upper()} NEWS {today}:\n\n"
-    url = f"https://newsapi.org/v2/everything?q={urllib.parse.quote(q)}&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
+
+    if platform == "telegram" and bot:
+        speak_telegram(chat_id, "How can I help you today?", bot)
+        bot.send_message(chat_id=chat_id, text=response)
+
+    return speak_laptop(response)
+
+
+def ask_country(chat_id=None, platform="laptop", bot=None):
+    user_states[chat_id] = "waiting_country"
+    msg = "Select country: India, USA, UK, or World."
+    if platform == "telegram" and bot:
+        speak_telegram(chat_id, "Which country?", bot)
+        bot.send_message(chat_id=chat_id, text=msg)
+    return speak_laptop(msg)
+
+
+def ask_state(chat_id, country, platform="laptop", bot=None):
+    user_states[chat_id] = ("waiting_state", country)
+    msg = f"Now say a state name in {country}."
+    if platform == "telegram" and bot:
+        speak_telegram(chat_id, f"{country} news. Which state?", bot)
+        bot.send_message(chat_id=chat_id, text=msg)
+    return speak_laptop(msg)
+
+
+def ask_city(chat_id, country, state, platform="laptop", bot=None):
+    user_states[chat_id] = ("waiting_city", country, state)
+    msg = f"Now say a city in {state}."
+    if platform == "telegram" and bot:
+        speak_telegram(chat_id, f"{state} news. Which city?", bot)
+        bot.send_message(chat_id=chat_id, text=msg)
+    return speak_laptop(msg)
+
+
+def get_news(country, state, city):
+    today = datetime.now().strftime("%B %d, %Y")
+    query = f"{city} {state} {country}"
+    url = f"https://newsapi.org/v2/everything?q={urllib.parse.quote(query)}&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
 
     try:
         r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            articles = r.json().get("articles", [])
-            if articles:
-                for i, article in enumerate(articles[:3]):
-                    title = (
-                        article["title"][:80] + "..."
-                        if len(article["title"]) > 80
-                        else article["title"]
-                    )
-                    link = article.get("url", "")
-                    news_text += f"{i+1}. <b>{title}</b>\n{link}\n\n"
-            else:
-                news_text += "No news found."
+            data = r.json()
+            articles = data.get("articles", [])
+
+            if not articles:
+                return None
+
+            news_text = f"TOP NEWS FOR {city}, {state}, {country} — {today}\n\n"
+
+            for i, article in enumerate(articles[:3]):
+                news_text += f"{i+1}. {article['title']}\n{article['url']}\n\n"
+
+            return news_text
         else:
-            news_text += "News service unavailable."
+            return None
     except:
-        news_text += "News temporarily unavailable."
-    return news_text
+        return None
 
 
-# ---- Music / website ----
-def play_music(query):
-    search_url = (
-        f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+def open_website(site):
+    url = f"https://www.{site}.com"
+    subprocess.Popen(
+        [r"C:\Program Files\Google\Chrome\Application\chrome.exe", url, "--new-window"]
     )
-    try:
-        options = webdriver.ChromeOptions()
-        options.add_argument("--new-window")
-        driver = webdriver.Chrome(options=options)
-        driver.maximize_window()
-        driver.get(search_url)
-        time.sleep(4)
-        first_video = driver.find_element(By.ID, "video-title")
-        first_video.click()
-        return f"Playing '{query}' on YouTube:\n{search_url}"
-    except:
-        return f"YouTube: {search_url}"
+    return f"Opened {site}: {url}"
 
 
-def open_website(url):
-    try:
-        subprocess.Popen(
-            [
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                url,
-                "--new-window",
-            ]
-        )
-        return f"Opened: {url}"
-    except:
-        return f"Link: {url}"
-
-
-# ---- AI command handler ----
-def handle_command(user_input, chat_id=None, first_message=False):
-    global user_states
+def handle_command(user_input, chat_id=None, platform="laptop", bot=None):
     user_input = user_input.lower().strip()
-    print(f"USER SAID: {user_input}")
 
-    # Startup greeting
-    if first_message:
-        msg = "Hi Praneeth! Your Malar Ma is here"
-        speak_laptop(msg)
-        if chat_id:
-            send_telegram_text(chat_id, msg)
-        return msg
-
-    # Initialize user state
-    if chat_id and chat_id not in user_states:
+    if chat_id not in user_states:
         user_states[chat_id] = "main_menu"
 
-    # ---- NEWS FLOW ----
+    if "hi malar ma" in user_input:
+        user_states[chat_id] = "main_menu"
+        return main_menu(chat_id, platform, bot)
+
+    state = user_states.get(chat_id)
+
+    if state == "waiting_country":
+        country = user_input
+        return ask_state(chat_id, country, platform, bot)
+
+    if isinstance(state, tuple) and state[0] == "waiting_state":
+        country = state[1]
+        state_name = user_input
+        return ask_city(chat_id, country, state_name, platform, bot)
+
+    if isinstance(state, tuple) and state[0] == "waiting_city":
+        country, state_name = state[1], state[2]
+        city = user_input
+
+        news = get_news(country, state_name, city)
+
+        if not news:
+            msg = (
+                "No news found for this city.\n"
+                "Do you want:\n"
+                "1. Try another city\n"
+                "2. Try another state\n"
+                "3. Back to main menu"
+            )
+            if platform == "telegram" and bot:
+                speak_telegram(chat_id, "No news found. What next?", bot)
+                bot.send_message(chat_id=chat_id, text=msg)
+            return speak_laptop(msg)
+
+        user_states[chat_id] = "main_menu"
+
+        if platform == "telegram" and bot:
+            speak_telegram(chat_id, f"Here is latest news for {city}", bot)
+            bot.send_message(chat_id=chat_id, text=news)
+
+        return speak_laptop(news)
+
     if "news" in user_input:
-        # Ask country
-        retries = 0
-        while retries < RETRY_LIMIT:
-            country = input("Country (Laptop) or enter via Telegram: ").strip()
-            if country:
-                break
-            retries += 1
-        else:
-            country = "India"
+        user_states[chat_id] = "waiting_country"
+        return ask_country(chat_id, platform, bot)
 
-        # Ask state
-        retries = 0
-        while retries < RETRY_LIMIT:
-            state = input("State (Laptop) or enter via Telegram: ").strip()
-            if state:
-                break
-            retries += 1
-        else:
-            state = "All"
+    if user_input.startswith("open "):
+        site = user_input.replace("open ", "").strip()
+        result = open_website(site)
 
-        # Ask city
-        retries = 0
-        while retries < RETRY_LIMIT:
-            city = input(
-                "City (Laptop) or enter via Telegram (type 'all' for none): "
-            ).strip()
-            if city:
-                break
-            retries += 1
-        else:
-            city = None
+        if platform == "telegram" and bot:
+            bot.send_message(chat_id=chat_id, text=result)
 
-        news_text = get_news_by_location(country, state, city)
-        print(news_text)
-        if chat_id:
-            send_telegram_text(chat_id, news_text)
-            speak_telegram(chat_id, news_text)
-        return news_text
+        return speak_laptop(result)
 
-    # ---- OPEN WEBSITE ----
-    elif user_input.startswith("open "):
-        site_name = user_input[5:].strip()
-        if not site_name.startswith("http"):
-            site_name = f"https://www.{site_name}.com"
-        msg = open_website(site_name)
-        if chat_id:
-            send_telegram_text(chat_id, msg)
-        speak_laptop(msg)
-        return msg
-
-    # ---- PLAY MUSIC ----
-    elif "play" in user_input:
-        song = user_input.replace("play", "").strip()
-        msg = play_music(song)
-        if chat_id:
-            send_telegram_text(chat_id, msg)
-        speak_laptop(msg)
-        return msg
-
-    # ---- DEFAULT AI RESPONSE ----
-    else:
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a friendly virtual assistant named Malar Ma",
-                },
-                {"role": "user", "content": user_input},
-            ],
-        )
-        output = completion.choices[0].message.content
-        if chat_id:
-            send_telegram_text(chat_id, output)
-            speak_telegram(chat_id, output)
-        speak_laptop(output)
-        return output
+    return main_menu(chat_id, platform, bot)
