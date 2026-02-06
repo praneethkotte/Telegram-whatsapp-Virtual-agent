@@ -3,3 +3,6 @@ __pycache__/
 *.ogg
 *.pyc
 .DS_Store
+.env
+temp.mp3
+*.mp3
