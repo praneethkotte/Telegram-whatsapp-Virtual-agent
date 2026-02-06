@@ -1,3 +1,5 @@
-# created by virtualenv automatically
-*
-.env
+env/
+__pycache__/
+*.ogg
+*.pyc
+.DS_Store
