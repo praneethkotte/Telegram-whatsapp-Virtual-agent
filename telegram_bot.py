@@ -62,8 +62,8 @@ async def telegram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 if __name__ == "__main__":
-    print("Starting Malar Ma...")
-    speak_laptop("Hi Praneeth! Your Malar Ma is here.")
+    print("Starting Assistant...")
+    speak_laptop("Hi Praneeth! Your Assistant is here.")
 
     threading.Thread(target=laptop_voice_listener, daemon=True).start()
     threading.Thread(target=laptop_keyboard_listener, daemon=True).start()

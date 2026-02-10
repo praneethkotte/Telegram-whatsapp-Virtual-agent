@@ -18,7 +18,7 @@ user_states = {}
 
 
 def speak_laptop(text):
-    print(f"MALAR MA: {text}")
+    print(f"Assistan: {text}")
     try:
         tts = gTTS(text)
         tts.save("temp.mp3")
@@ -55,7 +55,7 @@ def speak_whatsapp(text):
 
 def main_menu(chat_id=None, platform="laptop", bot=None):
     response = (
-        "Praneeth! Your Malar Ma is here. What can I do today?\n"
+        "Praneeth! Your Assistan is here. What can I do today?\n"
         "Say or type:\n"
         "1. News\n"
         "2. Open YouTube\n"
@@ -136,7 +136,7 @@ def handle_command(user_input, chat_id=None, platform="laptop", bot=None):
     if chat_id not in user_states:
         user_states[chat_id] = "main_menu"
 
-    if "hi malar ma" in user_input:
+    if "hi Assistan" in user_input:
         user_states[chat_id] = "main_menu"
         return main_menu(chat_id, platform, bot)
 
